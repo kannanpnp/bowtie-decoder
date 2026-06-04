@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bow Tie Decoder — investigation report → bow tie + HF + HFACS</title>
+<!-- v1.2 · bow tie (CCPS/EI) · hierarchy of controls · SB/FB/RB · DF/DFC · HF · DoD HFACS 8.0 -->
+<style>
+  :root{
+    --bg:#0f1418; --panel:#161d23; --panel2:#1d262e; --ink:#e9eef2; --muted:#9fb0bd;
+    --line:#33414c; --hazard:#7a5cff; --top:#b3211f; --threat:#2f6fb0; --conseq:#a8511b;
+    --ok:#2e9e5b; --degraded:#d99a1c; --failed:#d23b36; --absent:#8a8f95; --chip:#222d36;
+    --accent:#3d7aa3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45}
+  a{color:#7fb4d8}
+  header.top{padding:18px 24px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#141b21,#0f1418)}
+  header.top h1{margin:0 0 3px;font-size:19px}
+  header.top .sub{color:var(--muted);font-size:12.5px}
+  .wrap{padding:18px 22px 70px;max-width:1500px;margin:0 auto}
+
+  .console{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:18px}
+  .console h2{margin:0 0 12px;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:12px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld label{font-size:11.5px;color:var(--muted)}
+  .fld input,.fld select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit}
+  .fld input:focus,.fld select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .tabs{display:flex;gap:6px;margin:4px 0 10px}
+  .tab{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:12.5px;padding:7px 14px;border-radius:7px;cursor:pointer}
+  .tab.active{background:#24303a;color:var(--ink);border-color:var(--accent)}
+  textarea{width:100%;min-height:150px;resize:vertical}
+  .drop{border:1.5px dashed var(--line);border-radius:9px;padding:26px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;transition:.15s}
+  .drop.hover{border-color:var(--accent);background:#16222c;color:var(--ink)}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:#5b7a8f}
+  .btn.primary{background:#27506f;border-color:var(--accent);font-weight:600}
+  .btn.primary:hover{background:#2e5d80}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .status{font-size:12.5px;color:var(--muted);min-height:18px}
+  .status.err{color:#ee7c78}
+  .status.good{color:#5fd089}
+  .keynote{font-size:11.5px;color:var(--muted);margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .spinner{display:inline-block;width:13px;height:13px;border:2px solid #43586a;border-top-color:#7fb4d8;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  #output{display:none}
+  #editor{display:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:18px}
+  #editor textarea{min-height:300px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .ohead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+  .ohead h2{margin:0 0 3px;font-size:18px}
+  .ohead .meta{color:var(--muted);font-size:12.5px;max-width:760px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:10px 2px 16px;font-size:12px;color:var(--muted)}
+  .legend .item{display:flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .controls .btn{font-size:12.5px;padding:7px 13px}
+  .controls .btn.active{background:#27506f;border-color:var(--accent)}
+
+  .bowtie{display:grid;grid-template-columns:1fr 210px 1fr;gap:14px;align-items:stretch}
+  @media(max-width:1100px){.bowtie{grid-template-columns:1fr}.center-col{order:-1}}
+  .col h3{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600}
+  .leg{display:flex;flex-direction:column;gap:14px}
+  .row{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .row .head{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:13px;font-weight:600}
+  .threat .head{border-left:5px solid var(--threat)}
+  .conseq .head{border-left:5px solid var(--conseq)}
+  .row .cat{font-size:11px;color:var(--muted);padding:0 12px 10px;border-left:5px solid var(--threat);font-style:italic;margin-top:-2px}
+  .barriers{display:flex;flex-wrap:wrap;gap:7px;padding:0 12px 12px}
+  .barrier{position:relative;font-size:11.5px;padding:6px 9px;border-radius:6px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);display:flex;align-items:center;gap:6px;transition:.15s}
+  .barrier:hover{transform:translateY(-1px);border-color:#5b7a8f}
+  .barrier .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot.ok{background:var(--ok)} .dot.degraded{background:var(--degraded)}
+  .dot.failed{background:var(--failed)} .dot.absent{background:var(--absent)}
+  .barrier.failed{border-color:#5a2624;background:#241715}
+  .barrier.degraded{border-color:#5a4a1e;background:#241f12}
+  .barrier.absent{border-style:dashed}
+  .barrier .hf{position:absolute;top:-6px;right:-6px;width:15px;height:15px;border-radius:50%;background:var(--hazard);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid var(--panel)}
+  .hchip{font-size:8.5px;font-weight:700;letter-spacing:.4px;padding:1px 5px;border-radius:4px;flex:none}
+  .h-elimination{background:#123524;color:#6fdc9a;border:1px solid #2e9e5b}
+  .h-substitution{background:#0f2e33;color:#5fc9d8;border:1px solid #2e8a9e}
+  .h-engineering{background:#10283f;color:#6fb1e8;border:1px solid #2f6fb0}
+  .h-administrative{background:#33250f;color:#e8b46f;border:1px solid #a8721b}
+  .h-ppe{background:#2c1a33;color:#cf8fe8;border:1px solid #8a3aa8}
+  .dot.recommended{background:#3da3a8}
+  .barrier.recommended{border-color:#1e555a;background:#0f2628;border-style:dotted}
+  .pill-recommended{background:#0f2a2c;color:#6fd2d8;border:1px solid #3da3a8}
+  .stag{font-size:8.5px;font-weight:800;letter-spacing:.4px;padding:1px 4px;border-radius:4px;flex:none}
+  .stag-ok{background:#13301f;color:#5fd089}
+  .stag-degraded{background:#2e2710;color:#e6bd57}
+  .stag-failed{background:#2e1413;color:#ee7c78}
+  .stag-absent{background:#23262a;color:#aab2b9}
+  .stag-recommended{background:#0f2a2c;color:#6fd2d8}
+  .hfacs-tier{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+  .hfacs-tier .th{padding:10px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:9px}
+  .hfacs-tier .th .lvl{font-size:10px;font-weight:700;letter-spacing:.6px;padding:2px 8px;border-radius:10px;background:var(--chip);color:var(--muted)}
+  .hfacs-tier.t-org .th{border-left:5px solid #7a5cff}
+  .hfacs-tier.t-sup .th{border-left:5px solid #b3211f}
+  .hfacs-tier.t-pre .th{border-left:5px solid #a8511b}
+  .hfacs-tier.t-act .th{border-left:5px solid #2f6fb0}
+  .hfacs-item{display:flex;gap:11px;padding:9px 14px;border-top:1px solid var(--line);font-size:12.5px;align-items:flex-start}
+  .hfacs-item .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:2px 7px;flex:none;color:#9fc6e3}
+  .hfacs-item .cat{color:#cdb7ff;font-weight:600;flex:none;width:200px}
+  .hfacs-item .fnd{color:#dbe3e9;flex:1}
+  .hfacs-item .fnd .ct{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:3px}
+  @media(max-width:800px){.hfacs-item{flex-wrap:wrap}.hfacs-item .cat{width:auto}}
+  .hiersec{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:none}
+  .hiersec h3{margin:0 0 4px;font-size:14px;color:#9fc6e3}
+  .hiersec .sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .hbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px}
+  .hbar .hlab{width:120px;color:var(--muted);text-align:right;flex:none}
+  .hbar .track{flex:1;background:var(--panel2);border-radius:5px;height:18px;overflow:hidden}
+  .hbar .fill{height:100%;border-radius:5px;display:flex;align-items:center;padding-left:8px;font-size:10.5px;font-weight:700;color:#fff;min-width:0;transition:width .4s}
+  .f-elimination{background:#2e9e5b}.f-substitution{background:#2e8a9e}.f-engineering{background:#2f6fb0}.f-administrative{background:#a8721b}.f-ppe{background:#8a3aa8}
+  .hinsight{margin-top:12px;font-size:12.5px;color:#e6bd57;background:#241f12;border:1px solid #5a4a1e;border-radius:8px;padding:10px 13px}
+  .hinsight.balanced{color:#5fd089;background:#13301f;border-color:#2e9e5b}
+  .center-col{display:flex;flex-direction:column;justify-content:center;gap:12px}
+  .hazardbox,.topevent{border-radius:12px;padding:14px;text-align:center}
+  .hazardbox{background:linear-gradient(180deg,#2a1f55,#211a45);border:1px solid #4a3a9e}
+  .topevent{background:linear-gradient(180deg,#3a1212,#2a0e0e);border:1px solid #7a2422}
+  .hazardbox .lbl,.topevent .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;opacity:.7}
+  .hazardbox .v{font-size:13px;font-weight:600;margin-top:5px}
+  .topevent .v{font-size:14px;font-weight:700;margin-top:5px}
+  .knot{width:0;height:0;border-left:16px solid var(--top);border-top:13px solid transparent;border-bottom:13px solid transparent;margin:0 auto}
+
+  .panel-detail{position:fixed;top:0;right:0;height:100%;width:min(440px,92vw);background:var(--panel);border-left:1px solid var(--line);box-shadow:-10px 0 40px rgba(0,0,0,.5);transform:translateX(105%);transition:.25s;z-index:50;overflow-y:auto}
+  .panel-detail.open{transform:translateX(0)}
+  .panel-detail .pd-head{padding:18px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+  .panel-detail .pd-body{padding:18px 20px}
+  .panel-detail h3{margin:0 0 4px;font-size:16px;padding-right:24px}
+  .status-pill{display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;margin-top:6px;font-weight:600}
+  .pill-ok{background:#13301f;color:#5fd089;border:1px solid #2e9e5b}
+  .pill-degraded{background:#2e2710;color:#e6bd57;border:1px solid #d99a1c}
+  .pill-failed{background:#2e1413;color:#ee7c78;border:1px solid #d23b36}
+  .pill-absent{background:#23262a;color:#aab2b9;border:1px solid #6b7178}
+  .pd-body .sec{margin-bottom:16px}
+  .pd-body .sec h4{margin:0 0 5px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .pd-body .sec p{margin:0;font-size:13.5px;color:#dbe3e9}
+  .hfbox{background:#1c1633;border:1px solid #4a3a9e;border-radius:8px;padding:11px 13px;margin-top:4px}
+  .hfbox .t{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#b7a6ff;margin-bottom:4px;font-weight:600}
+  .hfbox p{font-size:13px;color:#e3ddf5;margin:0}
+  .cite{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:6px}
+  .closex{position:absolute;top:14px;right:16px;cursor:pointer;color:var(--muted);font-size:22px;line-height:1}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:.25s;z-index:40}
+  .overlay.show{opacity:1;pointer-events:auto}
+  .methodnote{background:#161f2a;border:1px solid #2c4a63;border-left:4px solid var(--accent);border-radius:8px;padding:11px 13px;margin-bottom:12px;font-size:12px;color:#bcd2e2}
+  .methodnote b{color:#9fc6e3}
+
+  .hf-analysis{margin-top:34px;border-top:1px solid var(--line);padding-top:26px}
+  .hf-analysis h2{font-size:17px;margin:0 0 4px}
+  .hf-analysis .lead{color:var(--muted);font-size:13.5px;max-width:920px;margin:0 0 20px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px}
+  .card h3{margin:0 0 8px;font-size:14px;color:#cdb7ff}
+  .card p{margin:0;font-size:13px;color:#dbe3e9}
+  .card .lab{font-size:11px;font-weight:700;color:#fff;background:var(--hazard);padding:2px 8px;border-radius:5px;display:inline-block;margin-right:6px}
+  table.pif{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px}
+  table.pif th,table.pif td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.pif th{background:var(--panel2);color:var(--muted);font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+  .swiss{margin-top:14px;font-size:13px;color:#dbe3e9}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+  .hide{display:none!important}
+  @media print{
+    .console,.controls,.btnrow,.keynote,header.top .sub{display:none!important}
+    body{background:#fff;color:#000}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>⧖ Bow Tie Decoder</h1>
+  <div class="sub">Paste or drop an incident investigation report → get an interactive bow tie diagram + human-factors analysis. 100% in your browser, with your own LLM key. Methodology: CCPS/EI <i>Bow Ties in Risk Management</i> + <i>Human Factors in the Chemical and Process Industries</i>.</div>
+</header>
+
+<div class="wrap">
+
+  <div class="console" id="console">
+    <h2>1 · Connect your model</h2>
+    <div class="grid">
+      <div class="fld">
+        <label>Provider</label>
+        <select id="provider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label>Model (editable — any model your key supports)</label>
+        <input id="model" list="modellist" placeholder="model id">
+        <datalist id="modellist"></datalist>
+      </div>
+      <div class="fld" style="grid-column:span 2">
+        <label>API key (stored only in this browser via localStorage)</label>
+        <input id="apikey" type="password" placeholder="paste your provider API key" autocomplete="off">
+      </div>
+    </div>
+
+    <h2 style="margin-top:8px">2 · Provide the report</h2>
+    <div class="tabs">
+      <div class="tab active" data-tab="paste">Paste text</div>
+      <div class="tab" data-tab="pdf">Upload PDF</div>
+    </div>
+    <div id="tab-paste">
+      <textarea id="reportText" placeholder="Paste the full text of the investigation / incident report here (e.g. a CSB, HSE or internal report)..."></textarea>
+    </div>
+    <div id="tab-pdf" class="hide">
+      <div class="drop" id="drop">Drop a PDF here, or click to choose a file.<br>Parsed locally with pdf.js — the file never leaves your machine.<br><b id="pdfname" style="color:#7fb4d8"></b></div>
+      <input type="file" id="pdffile" accept="application/pdf" class="hide">
+    </div>
+
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn primary" id="decodeBtn">Decode into bow tie ▸</button>
+      <button class="btn" id="demoBtn">Load PEMEX H₂S demo (no key needed)</button>
+      <button class="btn" id="importBtn">Import saved JSON</button>
+      <input type="file" id="importFile" accept="application/json" class="hide">
+      <span class="status" id="status"></span>
+    </div>
+    <div class="keynote">
+      🔒 Privacy: this is a static page. Your key and report go directly from your browser to the model provider — never to any server of this app.
+      <button class="btn" id="clearKey" style="font-size:11px;padding:4px 9px;margin-left:8px">Clear stored key</button>
+    </div>
+  </div>
+
+  <div id="editor">
+    <h2 style="margin:0 0 10px;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">Edit bow tie JSON</h2>
+    <textarea id="editorText" spellcheck="false"></textarea>
+    <div class="btnrow">
+      <button class="btn primary" id="applyEdit">Apply ▸</button>
+      <button class="btn" id="cancelEdit">Cancel</button>
+      <span class="status" id="editStatus"></span>
+    </div>
+  </div>
+
+  <div id="output">
+    <div class="ohead">
+      <div>
+        <h2 id="oTitle">—</h2>
+        <div class="meta" id="oMeta"></div>
+      </div>
+      <div class="btnrow">
+        <button class="btn" id="exportJson">⬇ JSON</button>
+        <button class="btn" id="exportHtml">⬇ Standalone HTML</button>
+        <button class="btn" id="printBtn">🖨 Print / PDF</button>
+        <button class="btn" id="editBtn">✎ Edit JSON</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="item"><span class="swatch" style="background:var(--ok)"></span><b>SB</b>&nbsp;Successful barrier</span>
+      <span class="item"><span class="swatch" style="background:var(--degraded)"></span><b>FB</b>&nbsp;Failed barrier — degraded/partial</span>
+      <span class="item"><span class="swatch" style="background:var(--failed)"></span><b>FB</b>&nbsp;Failed barrier — failed on the day</span>
+      <span class="item"><span class="swatch" style="background:var(--absent)"></span><b>FB</b>&nbsp;Failed barrier — absent</span>
+      <span class="item"><span class="swatch" style="background:#3da3a8"></span><b>RB</b>&nbsp;Recommended barrier (from report recommendations)</span>
+      <span class="item"><span class="swatch" style="background:var(--hazard)"></span><b style="color:#b7a6ff">HF</b>&nbsp;= degradation factor DF (+ its controls DFC) — click a barrier</span>
+    </div>
+    <div class="legend" style="margin-top:-8px">
+      <span class="item" style="color:var(--muted)">Hierarchy of control:</span>
+      <span class="item"><span class="hchip h-elimination">ELI</span>Elimination</span>
+      <span class="item"><span class="hchip h-substitution">SUB</span>Substitution</span>
+      <span class="item"><span class="hchip h-engineering">ENG</span>Engineering</span>
+      <span class="item"><span class="hchip h-administrative">ADM</span>Administrative</span>
+      <span class="item"><span class="hchip h-ppe">PPE</span>Personal protective equipment</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn active" data-filter="all">Show all barriers</button>
+      <button class="btn" data-filter="failed">Only failed / absent</button>
+      <button class="btn" data-filter="hf">Only barriers with HF factors</button>
+      <span style="width:14px"></span>
+      <button class="btn active" data-hfilter="all">All tiers</button>
+      <button class="btn" data-hfilter="elimination">Elimination</button>
+      <button class="btn" data-hfilter="substitution">Substitution</button>
+      <button class="btn" data-hfilter="engineering">Engineering</button>
+      <button class="btn" data-hfilter="administrative">Administrative</button>
+      <button class="btn" data-hfilter="ppe">PPE</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="hfJump">↓ Human factors analysis</button>
+    </div>
+
+    <div class="bowtie">
+      <div class="col">
+        <h3>Threats → Prevention barriers</h3>
+        <div class="methodnote"><b>Threat formulation (concept book §2.5.2):</b> threats are <b>specific, direct causes</b> of the top event. Human error is <b>not</b> used as a direct threat — it appears as <span style="color:#b7a6ff;font-weight:600">HF degradation factors</span> on barriers (Chapter 4).</div>
+        <div class="leg" id="threatLeg"></div>
+      </div>
+      <div class="center-col">
+        <div class="hazardbox"><div class="lbl">Hazard</div><div class="v" id="oHazard">—</div></div>
+        <div class="knot"></div>
+        <div class="topevent"><div class="lbl">Top Event</div><div class="v" id="oTop">—</div></div>
+      </div>
+      <div class="col">
+        <h3>Mitigation barriers → Consequences</h3>
+        <div class="leg" id="conseqLeg"></div>
+      </div>
+    </div>
+
+    <div class="hiersec" id="hierProfile"></div>
+
+    <div class="hf-analysis" id="hfSection">
+      <h2>Human Factors Analysis</h2>
+      <p class="lead">Sharp-end and organisational failures read through error vs violation, active vs latent failure, the Swiss Cheese Model, and Performance Influencing Factors.</p>
+      <div class="cards" id="hfCards"></div>
+      <div class="swiss" id="pifWrap">
+        <h3 style="color:#cdb7ff;margin:22px 0 6px;font-size:14px">Performance Influencing Factors (PIFs)</h3>
+        <table class="pif"><thead><tr><th>PIF</th><th>How it showed up</th><th>Barriers it degraded</th></tr></thead><tbody id="pifBody"></tbody></table>
+      </div>
+      <div class="swiss" id="swissWrap">
+        <h3 style="color:#cdb7ff;margin:24px 0 6px;font-size:14px">Swiss Cheese — how the holes lined up</h3>
+        <p id="swissText"></p>
+      </div>
+    </div>
+
+    <div class="hf-analysis" id="hfacsSection">
+      <h2>HFACS Analysis (DoD HFACS v8.0)</h2>
+      <p class="lead">The same failures classified with the Department of Defense Human Factors Analysis and Classification System — four tiers from latent organisational influences down to the active unsafe acts, with v8.0 nanocodes. Reading top-down shows how each upper tier set the conditions for the tier below.</p>
+      <div id="hfacsTiers"></div>
+    </div>
+
+    <footer id="oFooter"></footer>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="panel-detail" id="detail">
+  <div class="pd-head"><span class="closex" id="closeX">×</span><h3 id="dTitle">—</h3><span id="dStatus" class="status-pill"></span></div>
+  <div class="pd-body" id="dBody"></div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+'use strict';
+/* Captured pristine page for standalone export (script text is fully in DOM at execution). */
+const APP_HTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+/* ============ config & persistence ============ */
+const MODEL_SUGGESTIONS = {
+  anthropic: ['claude-sonnet-4-6','claude-opus-4-6','claude-haiku-4-5','claude-sonnet-4-5'],
+  openai: ['gpt-4o','gpt-4.1','gpt-4o-mini','o3']
+};
+const $ = id => document.getElementById(id);
+const els = {provider:$('provider'),model:$('model'),key:$('apikey'),status:$('status')};
+
+function loadCfg(){
+  try{
+    els.provider.value = localStorage.getItem('btd_provider') || 'anthropic';
+    els.key.value = localStorage.getItem('btd_key') || '';
+    els.model.value = localStorage.getItem('btd_model') || MODEL_SUGGESTIONS[els.provider.value][0];
+  }catch(e){}
+  fillModels();
+}
+function fillModels(){
+  const dl = $('modellist'); dl.innerHTML='';
+  (MODEL_SUGGESTIONS[els.provider.value]||[]).forEach(m=>{const o=document.createElement('option');o.value=m;dl.appendChild(o);});
+}
+els.provider.addEventListener('change',()=>{
+  fillModels();
+  els.model.value = MODEL_SUGGESTIONS[els.provider.value][0];
+  saveCfg();
+});
+['change','input'].forEach(ev=>{
+  els.model.addEventListener(ev,saveCfg);
+  els.key.addEventListener(ev,saveCfg);
+});
+function saveCfg(){
+  try{
+    localStorage.setItem('btd_provider',els.provider.value);
+    localStorage.setItem('btd_model',els.model.value);
+    localStorage.setItem('btd_key',els.key.value);
+  }catch(e){}
+}
+$('clearKey').addEventListener('click',()=>{els.key.value='';try{localStorage.removeItem('btd_key');}catch(e){};setStatus('Stored key cleared.','good');});
+
+function setStatus(msg,cls){els.status.innerHTML=msg;els.status.className='status'+(cls?' '+cls:'');}
+
+/* ============ tabs & pdf ============ */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  $('tab-paste').classList.toggle('hide',t.dataset.tab!=='paste');
+  $('tab-pdf').classList.toggle('hide',t.dataset.tab!=='pdf');
+}));
+
+let pdfText = '';
+const drop = $('drop');
+drop.addEventListener('click',()=>$('pdffile').click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('hover');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('hover'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('hover');if(e.dataTransfer.files[0])parsePdf(e.dataTransfer.files[0]);});
+$('pdffile').addEventListener('change',e=>{if(e.target.files[0])parsePdf(e.target.files[0]);});
+
+async function parsePdf(file){
+  try{
+    setStatus('<span class="spinner"></span>Parsing PDF locally…');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let out=[];
+    for(let p=1;p<=pdf.numPages;p++){
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      out.push(tc.items.map(i=>i.str).join(' '));
+    }
+    pdfText = out.join('\n\n');
+    $('pdfname').textContent = file.name+' — '+pdf.numPages+' pages, '+pdfText.length.toLocaleString()+' characters extracted ✓';
+    setStatus('PDF parsed. Ready to decode.','good');
+  }catch(err){
+    pdfText='';
+    setStatus('PDF parse failed: '+err.message,'err');
+  }
+}
+
+/* ============ decoder prompt ============ */
+const SYSTEM_PROMPT = [
+'You are a senior process-safety and human-factors analyst. You convert incident investigation reports into a rigorous bow tie analysis with an embedded human-factors layer.',
+'You strictly follow two references:',
+'1) "Bow Ties in Risk Management: A Concept Book for Process Safety" (CCPS / Energy Institute):',
+'   - HAZARD = an entity/operation with the potential to cause harm, stated with its dangerous condition (e.g. "pressurised hydrogen sulfide in process piping").',
+'   - TOP EVENT = the single moment control over the hazard is lost (e.g. loss of containment). Not a consequence.',
+'   - THREATS = specific, DIRECT causes of the top event with clear causation (concept book §2.5.1-2.5.2, p.27-29). Formulate every threat from these three categories: (1) PRIMARY EQUIPMENT NOT PERFORMING WITHIN NORMAL OPERATING LIMITS — mechanical faults (e.g. pump seal failure), equipment degradation or malfunction; (2) ENVIRONMENTAL INFLUENCE — overpressure due to solar heating of blocked-in lines, external weather, subsidence/settlement/earthquake; (3) OPERATIONAL ISSUES — process conditions such as insufficient personnel to support required human barriers during start-up. For loss-of-containment top events draw from the book p.28 list: overfilling/underfilling, overpressure/under pressure, corrosion, stress/fatigue, incorrect flange torqueing, embrittlement, erosion, wear and tear, physical damage/impact, subsidence/settlement/earthquake, bolted joint disassembled on live equipment. Style example (book Fig. 2-5): hazard "Gasoline stored in tank", top event "Tank overflow", threat "Planned fill volume exceeds residual capacity" — direct, specific, needing no further explanation. Never vague ("bad weather" is wrong; "reduced visibility on approach" is right): generic threats produce generic barriers; specific threats produce specific, actionable barriers. NEVER use human error, "operator error", or misidentification as a threat — human error must instead appear as a degradation factor on a barrier (Chapter 4). Tag each threat with its category in the "category" field.',
+'   - PREVENTION BARRIERS sit between a threat and the top event; MITIGATION BARRIERS sit between the top event and each consequence. A barrier must be a concrete control (engineered system, safety device, or defined human check) that on its own can stop the pathway.',
+'   - DEGRADATION FACTORS are conditions (very often human/organisational failures) that defeat or weaken a barrier. Put ALL human error, violations, and organisational failures here.',
+'   - HIERARCHY OF CONTROL: classify every barrier with "hier" as one of: elimination (removes the hazard or the exposure entirely, e.g. deferring conflicting work, de-inventory before work), substitution (replaces the hazard with something less dangerous), engineering (physical/hardware controls that act without in-the-moment human behaviour: isolation valves, interlocks, relief devices, fixed and personal gas detection/alarms, locking devices, hard segregation), administrative (procedures, permits, training, briefings, tags/signage/labels, verification steps, emergency plans, communication protocols), ppe (worn protection: respirators, escape sets, protective clothing). Classify by the MECHANISM through which the barrier works, not by who owns it.',
+'   - BARRIER CODING: status "s" encodes SB/FB/RB. SB (successful barrier) = "ok". FB (failed barrier) = "failed" (did not work), "degraded" (partial), or "absent" (did not exist on the day). RB (recommended barrier) = "recommended": scan the report RECOMMENDATIONS section — any recommendation that constitutes a barrier must be ADDED to the relevant threat or consequence leg with s:"recommended" and the recommendation number in "cite". For every FAILED barrier (failed/degraded/absent) populate BOTH "hf" (the degradation factor, DF — what defeated it) AND "dfc" (degradation factor controls, DFC — the concrete controls that would manage that DF, drawn from the report findings/recommendations where possible).',
+'   - CONSEQUENCES = distinct harm outcomes (people, environment, asset, reputation/community), each on its own leg.',
+'2) "Human Factors in the Chemical and Process Industries" (Elsevier 2016):',
+'   - Classify unsafe acts: errors (slips, lapses, mistakes) vs violations (routine, situational, exceptional).',
+'   - Distinguish active failures (sharp end) from latent failures (design, organisation, management decisions).',
+'   - Identify Performance Influencing Factors (PIFs) — internal or external conditions that made failure more likely.',
+'   - Apply the Swiss Cheese Model to explain how barrier holes aligned.',
+'3) DoD HFACS version 8.0 — classify the human factors findings into the four tiers with nanocodes in the "hfacs" array:',
+'   - Tier 1 UNSAFE ACTS (active failures): performance/skill-based errors AE101 unintended activation, AE102 procedure/checklist not followed correctly, AE105 scan/cross-check breakdown, AE107 rushed or delayed necessary action; judgment & decision-making errors AE201 inadequate real-time risk assessment, AE202 ineffective task prioritization, AE205 ignored caution/warning, AE207 misjudged/misperceived changing environment; known deviations AD000 (deliberate deviation from known rules, outcome unintended).',
+'   - Tier 2 PRECONDITIONS: cognitive states PC101 inattention, PC102 fixation, PC103 task saturation, PC104 confusion, PC105 negative habit transfer, PC106 distraction, PC110 change blindness/inaccurate expectation; psycho-behavioral PC206 overconfidence, PC209 pressing/haste/motivation; physiological PC307 fatigue; physical environment PE101-PE113; technological environment PE202 instrumentation/warning issues, PE207 personal equipment interference, PE208 communication equipment ineffective; personnel factors PP101 ineffective team resource management, PP109 task/mission planning or briefing inadequate; training conditions PT101 untrained worker, PT104 lack of proficiency/experience, PT105 lack of job-related safety training.',
+'   - Tier 3 SUPERVISORY/LEADER INFLUENCES: SC101 unit safety culture, SC102 pace of OPTEMPO/workload; SD001 failure to enforce published rules/guidance, SD002 allowed unwritten practices to become standard (normalization of deviance), SD003 directed circumvention; SI001 ineffective supervisory oversight, SI003 failed to provide effective training, SI004 failed to provide clear written procedure/guidance, SI006 lack of supervisory response to critical information, SI007 failed to identify/correct hazardous practices, SI008 tasked individuals lacking experience/currency/proficiency; SP006 ineffective deliberate risk assessment, SP008 ineffective pre-mission planning, SP010 insufficient manning/staffing, SP011 insufficient equipment/supplies.',
+'   - Tier 4 ORGANIZATIONAL INFLUENCES: OC001 organizational culture created increased risk, OC005 organizational structure unclear/inadequate; OP001 OPTEMPO/workload, OP002 program/operation not adequately assessed, OP003 unclear/impractical/inadequate policy or procedural guidance, OP005 flawed doctrine, OP006 inadequate program management/governance; OR004 poorly designed/unsuitable equipment, OR007 inadequate personnel/staffing resources, OR008 inadequate information resources; OT001 formal training program ineffective.',
+'   Use the most specific applicable nanocode; if unsure of the exact code, give the tier and category with the closest code. Latent codes (Tiers 3-4) must plausibly trace to the preconditions and acts below them.',
+'You must ground EVERYTHING in the supplied report. Do not invent facts. Where the report is silent, omit rather than fabricate. Cite report sections/pages in the "cite" fields when identifiable.',
+'You respond with VALID JSON ONLY — no markdown fences, no commentary.'
+].join('\n');
+
+function buildUserPrompt(reportText){
+  const schema = JSON.stringify({
+    meta:{title:'short incident title',location:'site, place',date:'incident date',reportRef:'report number / publisher',summary:'2-3 sentence factual summary of what happened'},
+    hazard:'the hazard with its dangerous condition',
+    topEvent:'the single loss-of-control moment',
+    threats:[{category:'threat category per concept book p.27-28 (equipment not within limits | environmental influence | operational issues) + LOC cause if applicable',title:'Threat — specific direct cause (never human error)',barriers:[{n:'barrier name (a concrete control)',s:'ok (SB) | degraded (FB) | failed (FB) | absent (FB) | recommended (RB, from report recommendations)',hier:'elimination|substitution|engineering|administrative|ppe (hierarchy of control tier, by mechanism)',desc:'what the barrier was meant to do and what actually happened (for RB: what the recommendation proposes)',hf:'DF — for failed barriers: the human/organisational degradation factor that defeated this barrier (error type / violation type / latent condition)',dfc:'DFC — for failed barriers: the concrete controls that would manage the degradation factor',cite:'report section / finding / recommendation refs'}]}],
+    consequences:[{title:'Consequence — distinct harm outcome with severity',barriers:[{n:'mitigation barrier',s:'ok|degraded|failed|absent|recommended',hier:'elimination|substitution|engineering|administrative|ppe',desc:'…',hf:'DF for failed barriers',dfc:'DFC for failed barriers',cite:'…'}]}],
+    humanFactors:{
+      cards:[{tag:'Active failure|Mental model|Violation|Latent failures|Defeated defences|Barrier portfolio|Culture',h:'short heading',p:'2-4 sentence analysis, may use <b> tags'}],
+      pifs:[['PIF name','how it showed up in this incident','barriers it degraded']],
+      swiss:'one paragraph: how the latent and active holes aligned, naming each layer that failed'
+    },
+    hfacs:[{tier:'Unsafe Acts|Preconditions|Supervisory/Leader Influences|Organizational Influences',category:'HFACS category, e.g. Judgment & Decision-Making Errors',code:'DoD HFACS v8.0 nanocode, e.g. AE201',finding:'how this code manifested in the incident',cite:'report refs'}]
+  },null,1);
+  return [
+'Decode the following investigation report into the bow tie + human factors JSON.',
+'',
+'REQUIREMENTS:',
+'- One hazard, one top event.',
+'- 1-4 threats, each specific and directly causal. Human error goes in barrier "hf" fields, never as a threat.',
+'- 3-8 prevention barriers across the threat legs; 2-5 mitigation barriers per consequence leg.',
+'- 2-5 consequence legs covering the distinct outcomes in the report (fatalities/injuries, community/environment, asset/business).',
+'- Barrier status "s" reflects how the barrier PERFORMED ON THE DAY: ok (worked), degraded (partial), failed (did not work), absent (did not exist / not provided).',
+'- Every barrier MUST carry "hier" — its hierarchy-of-control tier (elimination|substitution|engineering|administrative|ppe), classified by mechanism. If the bow tie ends up dominated by administrative/ppe barriers, reflect that weakness in a humanFactors card.',
+'- BARRIER CODING: barriers identified in the investigation get s = ok (SB) if they worked, failed/degraded/absent (FB) if they did not. Then scan the report RECOMMENDATIONS: every recommendation that constitutes a barrier must be added to the matching leg with s:"recommended" (RB) and the recommendation number in cite. For each FAILED barrier populate hf (DF) and dfc (DFC).',
+'- hfacs: 8-16 entries spanning all four tiers (at least one per tier where the report supports it), each with tier, category, v8.0 code, incident-specific finding, and cite.',
+'- humanFactors.cards: 4-6 cards classifying the failures (error types, violation types, active vs latent, situational awareness/mental model, defeated defences, culture/conduct of operations).',
+'- humanFactors.pifs: 5-9 rows.',
+'- Output ONLY the JSON object, matching this schema exactly:',
+'',
+schema,
+'',
+'=== INVESTIGATION REPORT TEXT BEGINS ===',
+reportText,
+'=== INVESTIGATION REPORT TEXT ENDS ==='
+  ].join('\n');
+}
+
+/* ============ LLM calls ============ */
+async function callAnthropic(key,model,userPrompt){
+  const res = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key':key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({model:model,max_tokens:8192,system:SYSTEM_PROMPT,messages:[{role:'user',content:userPrompt}]})
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error((data.error&&data.error.message)||('HTTP '+res.status));
+  return data.content.map(c=>c.text||'').join('');
+}
+async function callOpenAI(key,model,userPrompt){
+  const res = await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'content-type':'application/json','authorization':'Bearer '+key},
+    body:JSON.stringify({model:model,messages:[{role:'system',content:SYSTEM_PROMPT},{role:'user',content:userPrompt}]})
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error((data.error&&data.error.message)||('HTTP '+res.status));
+  return data.choices[0].message.content;
+}
+
+/* ============ JSON extraction & normalisation ============ */
+function extractJSON(text){
+  let t = text.trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim();
+  const a=t.indexOf('{'), b=t.lastIndexOf('}');
+  if(a===-1||b===-1) throw new Error('No JSON object found in model response.');
+  return JSON.parse(t.slice(a,b+1));
+}
+const STATUS_MAP = {ok:'ok',sb:'ok',effective:'ok',worked:'ok',successful:'ok',good:'ok',degraded:'degraded',partial:'degraded',weak:'degraded',failed:'failed',fb:'failed',fail:'failed',breached:'failed',defeated:'failed',absent:'absent',missing:'absent',none:'absent','not provided':'absent',recommended:'recommended',rb:'recommended',recommendation:'recommended',proposed:'recommended'};
+const HIER_MAP = {elimination:'elimination',eliminate:'elimination',substitution:'substitution',substitute:'substitution',engineering:'engineering',engineered:'engineering',hardware:'engineering',technical:'engineering',administrative:'administrative',admin:'administrative',procedural:'administrative',procedure:'administrative',organisational:'administrative',organizational:'administrative',ppe:'ppe','personal protective equipment':'ppe'};
+function normalize(d){
+  d = d||{};
+  d.meta = d.meta||{};
+  d.hazard = d.hazard||'(hazard not identified)';
+  d.topEvent = d.topEvent||'(top event not identified)';
+  const fixB = b=>({n:b.n||b.name||'(barrier)',s:STATUS_MAP[String(b.s||b.status||'').toLowerCase().trim()]||'degraded',hier:HIER_MAP[String(b.hier||b.hierarchy||b.type||'').toLowerCase().trim()]||'',desc:b.desc||b.description||'',hf:b.hf||'',dfc:b.dfc||'',cite:b.cite||''});
+  d.threats = (d.threats||[]).map(t=>({category:t.category||'',title:t.title||'(threat)',barriers:(t.barriers||[]).map(fixB)}));
+  d.consequences = (d.consequences||[]).map(c=>({title:c.title||'(consequence)',barriers:(c.barriers||[]).map(fixB)}));
+  d.humanFactors = d.humanFactors||{};
+  d.humanFactors.cards = d.humanFactors.cards||[];
+  d.humanFactors.pifs = d.humanFactors.pifs||[];
+  d.humanFactors.swiss = d.humanFactors.swiss||'';
+  d.hfacs = (d.hfacs||[]).map(x=>({tier:x.tier||'',category:x.category||'',code:x.code||'',finding:x.finding||'',cite:x.cite||''}));
+  return d;
+}
+
+/* ============ decode flow ============ */
+let DATA = null;
+$('decodeBtn').addEventListener('click',async ()=>{
+  const key=els.key.value.trim(), model=els.model.value.trim();
+  const onPaste = !$('tab-paste').classList.contains('hide');
+  const text = (onPaste ? $('reportText').value : pdfText).trim();
+  if(!key) return setStatus('Enter your API key first.','err');
+  if(!model) return setStatus('Enter a model id.','err');
+  if(text.length<400) return setStatus('Provide the report (paste text or upload a PDF) — it looks too short.','err');
+  const MAXC = 400000;
+  const sent = text.length>MAXC ? text.slice(0,MAXC)+'\n[...truncated...]' : text;
+  const btn=$('decodeBtn'); btn.disabled=true;
+  setStatus('<span class="spinner"></span>Decoding with '+model+' — extracting hazard, top event, threats, barriers, consequences, human factors… (30-90 s)');
+  try{
+    const raw = els.provider.value==='anthropic'
+      ? await callAnthropic(key,model,buildUserPrompt(sent))
+      : await callOpenAI(key,model,buildUserPrompt(sent));
+    DATA = normalize(extractJSON(raw));
+    render(DATA);
+    setStatus('Decoded ✓ — review the bow tie below, then refine via “Edit JSON” if needed.','good');
+  }catch(err){
+    setStatus('Decode failed: '+err.message,'err');
+  }finally{btn.disabled=false;}
+});
+
+/* ============ render ============ */
+const statusLabel = {ok:'SB — Successful barrier',degraded:'FB — Failed barrier (degraded / partial)',failed:'FB — Failed barrier (failed on the day)',absent:'FB — Failed barrier (absent / not provided)',recommended:'RB — Recommended barrier (from report recommendations)'};
+const STATUS_TAG = {ok:'SB',degraded:'FB',failed:'FB',absent:'FB',recommended:'RB'};
+const HIER_LABEL = {elimination:'Elimination',substitution:'Substitution',engineering:'Engineering',administrative:'Administrative',ppe:'PPE'};
+const HIER_CHIP  = {elimination:'ELI',substitution:'SUB',engineering:'ENG',administrative:'ADM',ppe:'PPE'};
+const HIER_DESC  = {
+  elimination:'Highest-order control — removes the hazard or the exposure entirely (e.g. deferring conflicting work, de-inventorying before work).',
+  substitution:'Replaces the hazard with something less dangerous.',
+  engineering:'Physical / hardware control that works without relying on in-the-moment human behaviour (isolation valves, interlocks, detection & alarms, locking devices).',
+  administrative:'Relies on people doing the right thing: procedures, permits, briefings, tags & signage, verification steps, emergency plans. Weaker — easily degraded by human factors.',
+  ppe:'Last line — worn protection (respirators, escape sets). Only limits harm to the individual; does nothing to the hazard.'
+};
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function barrierEl(b){
+  const el=document.createElement('div');
+  el.className='barrier '+b.s;
+  el.dataset.hf=b.hf?'1':'0';
+  el.dataset.status=b.s;
+  el.dataset.hier=b.hier||'';
+  const chip = b.hier?('<span class="hchip h-'+b.hier+'" title="'+HIER_LABEL[b.hier]+' control">'+HIER_CHIP[b.hier]+'</span>'):'';
+  const stag = '<span class="stag stag-'+b.s+'" title="'+statusLabel[b.s]+'">'+STATUS_TAG[b.s]+'</span>';
+  el.innerHTML='<span class="dot '+b.s+'"></span>'+stag+chip+'<span>'+esc(b.n)+'</span>'+(b.hf?'<span class="hf">HF</span>':'');
+  el.addEventListener('click',()=>openDetail(b));
+  return el;
+}
+function renderHierProfile(d){
+  const counts={elimination:0,substitution:0,engineering:0,administrative:0,ppe:0};
+  let total=0;
+  const all=[];
+  d.threats.forEach(t=>t.barriers.forEach(b=>all.push(b)));
+  d.consequences.forEach(c=>c.barriers.forEach(b=>all.push(b)));
+  all.forEach(b=>{if(b.s!=='recommended'&&b.hier&&counts[b.hier]!==undefined){counts[b.hier]++;total++;}});
+  const box=$('hierProfile');
+  if(!total){box.style.display='none';return;}
+  let html='<h3>Control hierarchy profile</h3><div class="sub">All barriers in place on the day (prevention + mitigation; recommended barriers excluded) classified against the hierarchy of controls. Strong bow ties lean on the upper tiers; a portfolio dominated by administrative controls and PPE is fragile — every one depends on humans performing correctly under real-world conditions.</div>';
+  Object.keys(counts).forEach(k=>{
+    const n=counts[k], pct=Math.round(n/total*100);
+    html+='<div class="hbar"><div class="hlab">'+HIER_LABEL[k]+'</div><div class="track"><div class="fill f-'+k+'" style="width:'+Math.max(pct,n?7:0)+'%">'+(n?(n+' ('+pct+'%)'):'')+'</div></div></div>';
+  });
+  const soft=counts.administrative+counts.ppe, softPct=Math.round(soft/total*100);
+  if(softPct>=60){
+    html+='<div class="hinsight">⚠ '+softPct+'% of the barrier portfolio is administrative or PPE — the two weakest tiers. This is exactly where human-factors degradation acts: each of these barriers depends on people, paperwork, and worn equipment performing correctly. Strengthening this bow tie means pushing controls up the hierarchy (engineered identification, interlocked isolation, hard segregation of live and dead systems).</div>';
+  }else{
+    html+='<div class="hinsight balanced">✓ The barrier portfolio has a reasonable share of higher-order controls ('+(100-softPct)+'% elimination/substitution/engineering).</div>';
+  }
+  box.innerHTML=html;box.style.display='block';
+}
+const HFACS_TIERS=[
+  {key:'org',label:'Tier 4 — Organizational Influences',sub:'latent · policy, culture, resources, process',match:/organi/i},
+  {key:'sup',label:'Tier 3 — Supervisory / Leader Influences',sub:'latent · oversight, planning, enforcement',match:/superv|leader/i},
+  {key:'pre',label:'Tier 2 — Preconditions to Unsafe Acts',sub:'active or latent · states, environment, personnel, training',match:/precond/i},
+  {key:'act',label:'Tier 1 — Unsafe Acts',sub:'active failures · errors & known deviations',match:/act/i}
+];
+function hfacsKey(tier){
+  if(/organi/i.test(tier))return 'org';
+  if(/superv|leader/i.test(tier))return 'sup';
+  if(/precond/i.test(tier))return 'pre';
+  return 'act';
+}
+function renderHfacs(d){
+  const box=$('hfacsTiers');box.innerHTML='';
+  const items=d.hfacs||[];
+  $('hfacsSection').style.display=items.length?'block':'none';
+  if(!items.length)return;
+  HFACS_TIERS.forEach(t=>{
+    const rows=items.filter(x=>hfacsKey(x.tier)===t.key);
+    if(!rows.length)return;
+    const div=document.createElement('div');div.className='hfacs-tier t-'+t.key;
+    let html='<div class="th">'+t.label+' <span class="lvl">'+t.sub+'</span></div>';
+    rows.forEach(r=>{
+      html+='<div class="hfacs-item"><span class="code">'+esc(r.code||'—')+'</span><span class="cat">'+esc(r.category)+'</span><span class="fnd">'+esc(r.finding)+(r.cite?('<span class="ct">Source: '+esc(r.cite)+'</span>'):'')+'</span></div>';
+    });
+    div.innerHTML=html;box.appendChild(div);
+  });
+}
+function legRow(item,kind){
+  const row=document.createElement('div');row.className='row '+kind;
+  const head=document.createElement('div');head.className='head';head.textContent=item.title;row.appendChild(head);
+  if(item.category){const c=document.createElement('div');c.className='cat';c.textContent=item.category;row.appendChild(c);}
+  const bar=document.createElement('div');bar.className='barriers';
+  item.barriers.forEach(b=>bar.appendChild(barrierEl(b)));
+  row.appendChild(bar);
+  return row;
+}
+function render(d){
+  $('output').style.display='block';
+  $('editor').style.display='none';
+  $('oTitle').textContent = d.meta.title||'Bow Tie Analysis';
+  $('oMeta').innerHTML = esc([d.meta.location,d.meta.date,d.meta.reportRef].filter(Boolean).join(' · '))+(d.meta.summary?('<br>'+esc(d.meta.summary)):'');
+  $('oHazard').textContent = d.hazard;
+  $('oTop').textContent = d.topEvent;
+  const tl=$('threatLeg');tl.innerHTML='';d.threats.forEach(t=>tl.appendChild(legRow(t,'threat')));
+  const cl=$('conseqLeg');cl.innerHTML='';d.consequences.forEach(c=>cl.appendChild(legRow(c,'conseq')));
+  renderHierProfile(d);
+  renderHfacs(d);
+  const cw=$('hfCards');cw.innerHTML='';
+  d.humanFactors.cards.forEach(c=>{
+    const x=document.createElement('div');x.className='card';
+    x.innerHTML='<h3><span class="lab">'+esc(c.tag||'HF')+'</span>'+esc(c.h||'')+'</h3><p>'+(c.p||'')+'</p>';
+    cw.appendChild(x);
+  });
+  const pb=$('pifBody');pb.innerHTML='';
+  d.humanFactors.pifs.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td><b>'+esc(r[0]||'')+'</b></td><td>'+esc(r[1]||'')+'</td><td style="color:var(--muted)">'+esc(r[2]||'')+'</td>';
+    pb.appendChild(tr);
+  });
+  $('pifWrap').style.display = d.humanFactors.pifs.length?'block':'none';
+  $('swissText').textContent = d.humanFactors.swiss;
+  $('swissWrap').style.display = d.humanFactors.swiss?'block':'none';
+  $('hfSection').style.display = (d.humanFactors.cards.length||d.humanFactors.pifs.length||d.humanFactors.swiss)?'block':'none';
+  $('oFooter').innerHTML='<p>Generated by Bow Tie Decoder. Bow tie structure per <i>Bow Ties in Risk Management</i> (CCPS/EI); human factors framing per <i>Human Factors in the Chemical and Process Industries</i> (Elsevier 2016). Barrier status reflects performance on the day of the incident, not design intent. AI-assisted output — verify against the source report before operational use.</p>';
+  FILTER.status='all';FILTER.hier='all';
+  document.querySelectorAll('.controls .btn[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));
+  document.querySelectorAll('.controls .btn[data-hfilter]').forEach(b=>b.classList.toggle('active',b.dataset.hfilter==='all'));
+  $('output').scrollIntoView({behavior:'smooth'});
+}
+
+/* detail panel */
+function openDetail(b){
+  $('dTitle').textContent=b.n;
+  const sp=$('dStatus');sp.textContent=statusLabel[b.s]||b.s;sp.className='status-pill pill-'+b.s;
+  let html='';
+  if(b.hier) html+='<div class="sec"><h4>Hierarchy of control</h4><p><span class="hchip h-'+b.hier+'">'+HIER_CHIP[b.hier]+'</span> <b>'+HIER_LABEL[b.hier]+'</b> — '+HIER_DESC[b.hier]+'</p></div>';
+  html+='<div class="sec"><h4>What this barrier was meant to do / what happened</h4><p>'+esc(b.desc)+'</p></div>';
+  if(b.hf) html+='<div class="sec"><h4>Degradation factor (DF)</h4><div class="hfbox"><div class="t">DF — what defeated this barrier</div><p>'+esc(b.hf)+'</p></div></div>';
+  if(b.dfc) html+='<div class="sec"><h4>Degradation factor controls (DFC)</h4><div class="hfbox" style="background:#102a2c;border-color:#3da3a8"><div class="t" style="color:#6fd2d8">DFC — controls to manage the DF</div><p>'+esc(b.dfc)+'</p></div></div>';
+  if(b.cite) html+='<div class="cite">Source: '+esc(b.cite)+'</div>';
+  $('dBody').innerHTML=html;
+  $('detail').classList.add('open');$('overlay').classList.add('show');
+}
+function closeDetail(){$('detail').classList.remove('open');$('overlay').classList.remove('show');}
+$('closeX').addEventListener('click',closeDetail);
+$('overlay').addEventListener('click',closeDetail);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+
+/* filters (status × hierarchy, combined) */
+const FILTER={status:'all',hier:'all'};
+function applyFilters(){
+  document.querySelectorAll('.barrier').forEach(el=>{
+    let s=true,h=true;
+    if(FILTER.status==='failed') s = el.dataset.status==='failed'||el.dataset.status==='absent';
+    if(FILTER.status==='hf') s = el.dataset.hf==='1';
+    if(FILTER.hier!=='all') h = el.dataset.hier===FILTER.hier;
+    el.style.display=(s&&h)?'':'none';
+  });
+}
+document.querySelectorAll('.controls .btn[data-filter]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.controls .btn[data-filter]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');FILTER.status=btn.dataset.filter;applyFilters();
+}));
+document.querySelectorAll('.controls .btn[data-hfilter]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.controls .btn[data-hfilter]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');FILTER.hier=btn.dataset.hfilter;applyFilters();
+}));
+$('hfJump').addEventListener('click',()=>$('hfSection').scrollIntoView({behavior:'smooth'}));
+
+/* ============ export / import / edit ============ */
+function download(name,content,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:type}));
+  a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+function slug(){return ((DATA&&DATA.meta&&DATA.meta.title)||'bowtie').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,50);}
+$('exportJson').addEventListener('click',()=>{if(DATA)download(slug()+'.json',JSON.stringify(DATA,null,2),'application/json');});
+$('exportHtml').addEventListener('click',()=>{
+  if(!DATA)return;
+  const json=JSON.stringify(DATA).replace(/<\//g,'<\\/');
+  const tag='<scr'+'ipt>window.__PRELOAD__='+json+';</scr'+'ipt>';
+  download(slug()+'.html',APP_HTML.replace('<body>','<body>'+tag),'text/html');
+});
+$('printBtn').addEventListener('click',()=>window.print());
+$('editBtn').addEventListener('click',()=>{
+  if(!DATA)return;
+  $('editorText').value=JSON.stringify(DATA,null,2);
+  $('editor').style.display='block';
+  $('editor').scrollIntoView({behavior:'smooth'});
+});
+$('applyEdit').addEventListener('click',()=>{
+  try{
+    DATA=normalize(JSON.parse($('editorText').value));
+    $('editStatus').textContent='';
+    render(DATA);
+  }catch(err){
+    $('editStatus').textContent='Invalid JSON: '+err.message;
+    $('editStatus').className='status err';
+  }
+});
+$('cancelEdit').addEventListener('click',()=>{$('editor').style.display='none';});
+$('importBtn').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{DATA=normalize(JSON.parse(r.result));render(DATA);setStatus('JSON imported ✓','good');}catch(err){setStatus('Import failed: '+err.message,'err');}};
+  r.readAsText(f);
+});
+
+/* ============ PEMEX demo (decoded from CSB Report 2024-05-I-TX) ============ */
+const DEMO = {
+ meta:{title:'Fatal Hydrogen Sulfide Release — PEMEX Deer Park Refinery',location:'Deer Park, Texas',date:'10 October 2024',reportRef:'CSB Report No. 2024-05-I-TX (Feb 2026)',summary:'During blind removal in the Amine Unit, contract boilermakers unbolted a flange on the wrong, live ARU7 acid-gas line, releasing ~27,000 lb of hydrogen sulfide over nearly an hour. Two workers were fatally injured, 13 hospitalised, and shelter-in-place orders were issued for Deer Park and Pasadena.'},
+ hazard:'Pressurised acid gas — ~90% hydrogen sulfide at ~15 psig in ARU7 process piping (operational unit)',
+ topEvent:'Uncontrolled release of H₂S — bolted flange opened on the live ARU7 acid-gas line',
+ threats:[
+  {category:'Threat category: LOC cause — bolted-joint integrity breached (cf. "incorrect flange torqueing", concept book p.28)',
+   title:'Threat — Bolted flange joint disassembled on the live ARU7 acid-gas line while it still contained pressurised H₂S (line break on non-isolated, inventory-bearing equipment)',
+   barriers:[
+    {n:'Comprehensive job package & isolation drawings',s:'failed',hier:'administrative',desc:'The blind list and process sketch did not clearly indicate where each flange to open was physically located, so the crew could not navigate to Blind 407 from the paperwork.',hf:'Inadequate information / job aids (latent condition). The crew abandoned the paperwork and navigated by physical field cues instead.',dfc:'Quality control of job packages — peer review against P&IDs; a field-verification step requiring the crew to reconcile the drawing with the physical location before any joint is broken.',cite:'CSB §3.1.1; Finding 1'},
+    {n:'Hazard communication on unit reassignment (briefing / MOC)',s:'failed',hier:'administrative',desc:'Boilermakers were moved overnight from the shut-down Sulfur Unit turnaround into the partially operational Amine Unit. Nobody told them they had changed units or that it held pressurised H₂S.',hf:'Wrong mental model / loss of situational awareness — the crew believed they were in "Positive Isolation" and applied turnaround rules to a live unit.',dfc:'Mandatory re-briefing trigger whenever a crew changes unit or a unit changes status, with sign-on confirmation of hazards, safeguards and requirements (now formalised as CSB R2).',cite:'CSB §3.3; Findings 14-16'},
+    {n:'ANSI/ASME A13.1 pipe labelling (ARU6 vs ARU7)',s:'absent',hier:'administrative',desc:'Two visually identical acid-gas lines ran 5 ft apart. Neither was labelled — no independent fixed way to confirm which system a flange belonged to.',hf:'Missing fixed identification (a warning-type control) — post-incident recommendation R1 required A13.1 labelling.',dfc:'A13.1 labelling programme for ARU6/ARU7 with periodic audit of label condition and coverage (CSB R1).',cite:'CSB §2.4; Finding 5; R1'},
+    {n:'Positive equipment identification — blind tag on the flange',s:'failed',hier:'administrative',desc:'The Blind 407 tag was hung on a platform railing above the piping, out of the line of sight of the work. The boilermakers never saw it.',hf:'Latent error embedded in the barrier itself — implemented in a way that defeated its own purpose.',dfc:'Tagging standard requiring the tag at the flange (or physically locked to it); supervisor check that every tag is visible from the work position before the permit is issued.',cite:'CSB §2.2, §2.4; Findings 2-3'},
+    {n:'Flange-locking device as isolation / ID control',s:'failed',hier:'engineering',desc:'A locked device physically impedes opening a flange. Boilermakers placed unlocked devices by turnaround habit; operators never locked them. A stray unlocked device sat on the live ARU7 flange.',hf:'Habit / skill transfer from the turnaround context turned a hardware control into a false-positive identifier pointing at the wrong line.',dfc:'Lock control procedure — devices issued, locked and logged only by operations; routine sweep/audit for stray or unlocked devices outside turnaround scope.',cite:'CSB §2.2, §2.4; Findings 2,6'},
+    {n:'Permit-to-work — specific scope & hold point',s:'failed',hier:'administrative',desc:'One broad permit covered 15 blinds with different hazards, against PEMEX rules; the stop-work instruction before acid-gas line breaks had no unambiguous hold point and was overlooked.',hf:'Latent organisational failure (permit design) plus a procedural violation enabled by ambiguity.',dfc:'Permit segregation by hazard; explicit hold points requiring operator signature at the point of work before each acid-gas line break; periodic permit audits (CSB R3).',cite:'CSB §3.2.1-3.2.2; Findings 11-12'},
+    {n:'Confirm isolation & de-inventory at point of work (drain/bleed/gauge/gas test)',s:'failed',hier:'administrative',desc:'Verified for the first 13 blinds but NOT for the final two acid-gas blinds — the operator expected to be present later, so isolation of the flange actually opened was never confirmed.',hf:'Verification skipped on the highest-hazard flanges; "I will be there later" removed the check where it mattered most.',dfc:'Point-of-work verification mandatory for every line break with no deferral permitted; verification recorded on the permit before bolts are touched.',cite:'CSB §2.3-2.4'},
+    {n:'Operator present / independent verification at line break',s:'failed',hier:'administrative',desc:'Required by the permit for acid-gas line breaks. The operator left after 12 of 13 blinds; the foreman believed he had verbal permission to continue. No operator was present at Blind 407.',hf:'Loss of independent verification through workload pressure and informal "verbal permission".',dfc:'Hard hold point — work physically stopped (permit withheld) until the operator attends; verbal continuation explicitly prohibited; operator workload planned to cover line-break attendance.',cite:'CSB §2.3-2.4; Finding 11'},
+    {n:'RB — Standardised equipment-opening marking for all line breaks',s:'recommended',hier:'administrative',desc:'CSB R4 asks ASME to develop written guidelines for marking equipment for opening — clear identifiers of the area to be opened and removal of markings at job end; R1 requires A13.1 pipe labelling in ARU6/ARU7. Together these create one consistent positive-identification system across turnaround and run-and-maintain work.',cite:'CSB Recommendations R1, R4'},
+    {n:'RB — Unit-status hazard instruction for reassigned craftworkers',s:'recommended',hier:'administrative',desc:'CSB R2: procedures ensuring any craftworker introduced to or removed from a unit in Positive Isolation Status receives instruction defining the hazards, safeguards and requirements of the unit, with clear communication of control measures before commencing work in a new area.',cite:'CSB Recommendation R2'},
+    {n:'RB — Conduct of operations system with behavioural metrics & audits',s:'recommended',hier:'administrative',desc:'CSB R3: establish and enforce a conduct of operations system per CCPS guidance covering management commitment, employee input, workable procedures (permitting, equipment marking, energy isolation) and regular audits of adherence.',cite:'CSB Recommendation R3'}
+   ]}
+ ],
+ consequences:[
+  {title:'Consequence — Fatal H₂S exposure of a Repcon boilermaker at the release point',barriers:[
+    {n:'Personal H₂S gas detector (10 ppm alarm)',s:'failed',hier:'engineering',desc:'Both boilermakers removed their monitors before connecting to supplied air (policy did not require them on supplied air) — no alarm, no odour detection.',hf:'A protective policy created a sensing blind spot at the worst possible location.',dfc:'Policy change: personal gas detectors worn at all times during line breaks, including on supplied air; portable area monitor staged at the point of work.',cite:'CSB §2.4-2.5'},
+    {n:'Supplied-air respirator',s:'degraded',hier:'ppe',desc:'Protected only while connected; when the flange burst the workers disconnected to flee, entering the cloud.',hf:'Protection coupled to a fixed airline does not survive an escape.',dfc:'Escape-capable respiratory protection for line-break tasks; pre-task drill of disconnect-and-escape sequence.',cite:'CSB §2.5'},
+    {n:'Emergency escape bottle',s:'failed',hier:'ppe',desc:'One worker escaped; the other was found with mask removed, escape cylinder unclipped (strap around one leg), regulator on continuous flow, bottle empty. He died ~30 ft from the release.',hf:'Fine-motor and procedural breakdown under acute stress — when last-resort PPE is hardest to use correctly.',dfc:'Buddy-checked donning and securing of escape sets before connecting to supplied air; regular hands-on escape-set drills under realistic stress; bottle-watch verifies fit and regulator setting.',cite:'CSB §2.5'}
+  ]},
+  {title:'Consequence — Downwind fatal H₂S exposure of an ISC worker in the Sulfur Unit',barriers:[
+    {n:'Respiratory / escape protection for downwind workers',s:'absent',hier:'ppe',desc:'ISC workers ~250 ft downwind in the de-inventoried turnaround area had no respiratory protection or escape sets — that area was considered hazard-free.',hf:'Hazard from an adjacent unit was never assessed for the turnaround workforce.',dfc:'SIMOPs review extends escape-set requirements to crews downwind of any live-line work; toxic-gas refuge or escape-set caches in turnaround areas adjacent to operating units.',cite:'CSB §2.7; Finding 13'},
+    {n:'Defer line break until turnaround complete (SIMOPs control)',s:'failed',hier:'elimination',desc:'Delaying the Amine Unit pipe opening until the turnaround ended would have removed the exposed population entirely. The hazard of opening live piping directly upwind of a unit full of contractors was never evaluated.',hf:'Latent organisational failure — the permit system did not require cross-unit / simultaneous-operations hazard evaluation, so the eliminative option was never considered.',dfc:'Permit-to-work requires documented cross-unit hazard evaluation; scheduling rule prohibiting line breaks upwind of occupied turnaround areas without senior review.',cite:'CSB §3.2.3; Finding 13'},
+    {n:'Evacuation to a safe assembly point',s:'degraded',hier:'administrative',desc:'The primary assembly point lay upwind toward the release, so evacuees moved through contaminated air; one worker collapsed from a caged ladder and died.',hf:'Muster route ran into the hazard under the prevailing wind.',dfc:'Wind-aware muster plan with alternate assembly points and windsocks; evacuation drills covering toxic-release scenarios.',cite:'CSB §2.7'}
+  ]},
+  {title:'Consequence — Mass exposures: 13 hospitalised, 47 evaluated',barriers:[
+    {n:'Area / fixed gas detection & alarms',s:'degraded',hier:'engineering',desc:'Sulfur Unit portable monitors detected H₂S within ~1 min (500-800 ppm), but Amine Unit alarms lagged 4+ min and the site-wide alarm sounded only 12 min after the release.',hf:'Slow, uneven warning propagation let exposures accumulate.',dfc:'Integrate portable and fixed detection so any confirmed high reading triggers prompt local and site-wide alerting automatically.',cite:'CSB §2.6'},
+    {n:'Radio notification of operators',s:'failed',hier:'administrative',desc:'Code Red technicians radioed operators and got no response; alerting reverted to a worker running to the operations building.',hf:'No reliable acknowledged communication channel.',dfc:'Dedicated emergency channel with mandatory acknowledgement protocol; secondary alerting path (e.g. control-room alarm push) when no acknowledgement is received.',cite:'CSB §2.5-2.6'},
+    {n:'Personal H₂S detectors on surrounding crews',s:'ok',hier:'engineering',desc:'Personal detectors across the Sulfur Unit alarmed (many pegged >100 ppm), driving evacuation — this barrier worked and limited the death toll.',cite:'CSB §2.7'}
+  ]},
+  {title:'Consequence — Offsite community impact (shelter-in-place, Deer Park & Pasadena)',barriers:[
+    {n:'Source isolation / emergency response',s:'failed',hier:'engineering',desc:'Manual valves could not be fully closed before SCBA air ran low; remote valve closure at 4:49 pm did not stop back-flow through open manual valves; release ran ~1 h until responders re-bolted the flange.',hf:'Recovery defeated by process configuration (reverse flow) and SCBA endurance limits.',dfc:'Remote/automated isolation on acid-gas headers both sides of breakable joints; reverse-flow protection (check valves); pre-planned isolation drills with SCBA endurance factored in.',cite:'CSB §2.8'},
+    {n:'Community alerting / shelter-in-place',s:'ok',hier:'administrative',desc:'Both cities issued shelter-in-place orders lasting several hours, limiting offsite exposure.',cite:'CSB §2.9'}
+  ]},
+  {title:'Consequence — ~27,000 lb H₂S to atmosphere & $12.3M business loss',barriers:[
+    {n:'Rapid leak isolation',s:'failed',hier:'engineering',desc:'With the flange open and flow not isolable, the inventory vented for nearly an hour; loss of the Amine Unit and downstream processes cost $12.3M.',hf:'Release duration drove total mass emitted.',dfc:'Sectionalising remote isolation to limit releasable inventory; flange re-assembly kit and trained team on standby during line-break campaigns.',cite:'CSB §2.8-2.9'}
+  ]}
+ ],
+ humanFactors:{
+  cards:[
+   {tag:'Active failure',h:'Opening the wrong flange — a rule-based MISTAKE, not a slip',p:'The boilermakers did exactly what they intended: they deliberately unbolted a flange they had identified as Blind 407. Correct execution of a wrong plan is a <b>mistake</b> (planning/diagnosis failure), not a <b>slip</b> (execution failure). It is the sharp-end active failure that opened containment.'},
+   {tag:'Mental model',h:'Wrong situational model — "we are in Positive Isolation"',p:'Moved overnight from a fully isolated turnaround unit into a live unit with no briefing, the crew carried their turnaround mental model: every line empty, blinds tagged, locking devices marking the work. Loss of situational awareness is the connective tissue through nearly every failed prevention barrier.'},
+   {tag:'Violation',h:'Routine, not malicious — habit transfer and informal permissions',p:'Relying on flange-locking devices to find work, skipping the blind list, and continuing on "verbal permission" without the operator are <b>routine violations</b> — custom-and-practice shortcuts carrying no expectation of harm, driven by poor job aids and ambiguous permits rather than recklessness.'},
+   {tag:'Latent failures',h:'Organisational holes created long before the line break',p:'The tag on the railing, un-labelled twin pipes, the broad mixed-hazard permit without a hold point, the policy allowing detector removal, contractor reassignment without re-briefing, and weak conduct of operations are <b>latent failures</b> set upstream, dormant until the crew reached Blind 407.'},
+   {tag:'Defeated defences',h:'Mitigation barriers stripped by the same conditions',p:'The consequence side repeats the story: detectors removed by policy, escape PPE failing under panic, radios unanswered, a muster point downwind. Recovery barriers were degraded by the same organisational conditions that defeated prevention — the hallmark of systemic failure.'},
+   {tag:'Barrier portfolio',h:'An administrative-heavy bow tie — fragile by design',p:'Seven of eight prevention barriers were <b>administrative</b> (paperwork, tags, permits, human verification) — the second-weakest tier of the hierarchy of controls. Every one depended on people performing correctly, which is precisely what the degradation factors attacked. The only engineered prevention control (the flange-locking device) was misused, and the one <b>eliminative</b> option (deferring the line break until the turnaround ended) was never considered.'},
+   {tag:'Culture',h:'Procedures that existed but were not lived',p:'CSB found written procedures broadly aligned with good practice yet routinely not followed or understood by operations and management (Finding 17). The gap between documented and actual practice — operational discipline — is itself a human-factors finding (Recommendation R3).'}
+  ],
+  pifs:[
+   ['Unfamiliar work environment','Crew had never worked the Amine Unit; relocated from turnaround with no orientation to live-unit hazards.','Hazard communication; positive ID'],
+   ['Poor information / job aids','Blind list and sketch could not locate flanges; no clear drawings in the job package.','Job package; positive ID'],
+   ['Inadequate signage / labelling','No pipe labels; key blind tag hung out of sight on a railing.','Pipe labelling; blind tag'],
+   ['Ambiguous procedures','Broad permit mixing hazards, no unambiguous hold point; "verbal permission" filled the gap.','Permit; operator present'],
+   ['Time on task / workload','Hours of repetitive blind removal; operator pulled away to other duties.','Operator verification'],
+   ['Masked senses / PPE','Supplied-air respirators plus removed detectors eliminated both alarm and smell at the release point.','Gas detector; escape PPE'],
+   ['Acute stress','Flange burst forced disconnection and escape; fine-motor failure with the escape bottle.','Escape respirator'],
+   ['Communication gaps','Radio alerts went unanswered; alerting reverted to running on foot.','Radio notification; area alarms']
+  ],
+  swiss:'The trajectory passed cleanly through every layer: a broad permit mixing hazards without a hard hold point → a blind tag hung out of sight on a railing → no pipe labelling to tell ARU6 from ARU7 → a misleading unlocked flange-locking device on the live line → contractors moved into an active unit without a hazard briefing → the operator absent at the line break → the personal gas detector removed by policy. Remove any single slice and the release is interrupted. None held.'
+ },
+ hfacs:[
+  {tier:'Organizational Influences',category:'Policy & Process Issues',code:'OP003',finding:'Permitting policy was unclear and impractical in use: one broad permit covered jobs with different hazards against written rules, and procedures across permitting, marking and isolation were routinely misunderstood by staff and management.',cite:'CSB §3.2, §3.4; Findings 11, 17'},
+  {tier:'Organizational Influences',category:'Organizational Culture',code:'OC001',finding:'Documented practice and actual practice diverged across the site — deviation from written procedures was normal and accepted, creating elevated risk (weak conduct of operations).',cite:'CSB §3.4; Finding 17; R3'},
+  {tier:'Organizational Influences',category:'Program Management / Governance',code:'OP006',finding:'Turnaround contractor management lacked governance for moving crews between units of different status — no programme ensured hazard instruction on reassignment.',cite:'CSB §3.3; Findings 14-16; R2'},
+  {tier:'Supervisory/Leader Influences',category:'Provided Inadequate Procedure/Guidance',code:'SI004',finding:'The job package (blind list and sketch) and the permit gave the crew no clear, unambiguous guidance on which flange to open or where to stop work.',cite:'CSB §3.1.1; Findings 1, 12'},
+  {tier:'Supervisory/Leader Influences',category:'Normalization of Deviance',code:'SD002',finding:'Unwritten practices had become standard: continuing line breaks on "verbal permission" without the operator, hanging blind tags off the flange, and leaving unlocked flange-locking devices in the field.',cite:'CSB §2.3-2.4; Findings 2, 11'},
+  {tier:'Supervisory/Leader Influences',category:'Ineffective Deliberate Risk Assessment',code:'SP006',finding:'No evaluation of the risk of opening live acid-gas piping directly upwind of an occupied turnaround unit; the option to defer the work was never weighed.',cite:'CSB §3.2.3; Finding 13'},
+  {tier:'Supervisory/Leader Influences',category:'Tasked Individuals Lacking Familiarity',code:'SI008',finding:'A day-shift crew that had never worked the Amine Unit, and had not installed the blinds, was assigned the removal task without orientation to the live unit.',cite:'CSB §2.3; Findings 14-16'},
+  {tier:'Preconditions',category:'Negative Habit Transfer',code:'PC105',finding:'The boilermakers reverted to highly learned turnaround behaviour — using flange-locking devices as work markers — in a unit where that convention did not apply.',cite:'CSB §2.4; Findings 2, 6'},
+  {tier:'Preconditions',category:'Change Blindness / Inaccurate Expectation',code:'PC110',finding:'The crew expected a fully isolated "Positive Isolation" environment and did not perceive they had moved into a partially operational unit containing pressurised H₂S.',cite:'CSB §3.3; Findings 15-16'},
+  {tier:'Preconditions',category:'Planning / Briefing Inadequate',code:'PP109',finding:'No pre-task briefing covered the hazards, safeguards and requirements of the Amine Unit before the crew began the blind-removal work.',cite:'CSB §3.3; Finding 14'},
+  {tier:'Preconditions',category:'Personal Equipment Interference',code:'PE207',finding:'Supplied-air hoods plus the policy-permitted removal of personal H₂S detectors eliminated both smell and alarm at the release point, masking the leak while bolts were removed.',cite:'CSB §2.4-2.5'},
+  {tier:'Unsafe Acts',category:'Misjudged / Misperceived Environment',code:'AE207',finding:'The boilermakers identified the wrong, live ARU7 flange as Blind 407 from misleading field cues (an unlocked flange-locking device) — a judgment error, executed exactly as intended.',cite:'CSB §2.4-2.5; Finding 2'},
+  {tier:'Unsafe Acts',category:'Procedure / Checklist Not Followed Correctly',code:'AE102',finding:'The blind list and drawing were not used to locate the work, and the permit instruction to stop and have an operator present before acid-gas line breaks was overlooked.',cite:'CSB §2.4; Findings 1, 12'},
+  {tier:'Unsafe Acts',category:'Inadequate Real-Time Risk Assessment',code:'AE201',finding:'The final, highest-hazard line breaks proceeded without the operator and without point-of-work verification that the piping was depressurised.',cite:'CSB §2.3-2.4; Finding 11'}
+ ]
+};
+$('demoBtn').addEventListener('click',()=>{DATA=normalize(JSON.parse(JSON.stringify(DEMO)));render(DATA);setStatus('PEMEX demo loaded ✓','good');});
+
+/* ============ startup ============ */
+window.addEventListener('DOMContentLoaded',()=>{
+  loadCfg();
+  if(window.__PRELOAD__){
+    DATA=normalize(window.__PRELOAD__);
+    document.getElementById('console').style.display='none';
+    render(DATA);
+  }
+});
+</script>
+</body>
+</html>
