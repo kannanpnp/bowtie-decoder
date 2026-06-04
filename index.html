@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bow Tie Decoder — investigation report → bow tie + HF + HFACS</title>
-<!-- v1.2 · bow tie (CCPS/EI) · hierarchy of controls · SB/FB/RB · DF/DFC · HF · DoD HFACS 8.0 -->
+<title>Risk2Safe — Bow Tie Investigation Decoder</title>
+<!-- v1.3 · bow tie (CCPS/EI) · hierarchy of controls · SB/FB/RB · DF/DFC · HF · DoD HFACS 8.0 · recommendations -->
 <style>
   :root{
     --bg:#0f1418; --panel:#161d23; --panel2:#1d262e; --ink:#e9eef2; --muted:#9fb0bd;
@@ -105,6 +105,7 @@
   .hfacs-item .cat{color:#cdb7ff;font-weight:600;flex:none;width:200px}
   .hfacs-item .fnd{color:#dbe3e9;flex:1}
   .hfacs-item .fnd .ct{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:3px}
+  .hfacs-item .fnd .rec{display:block;font-size:11.5px;color:#6fd2d8;margin-top:4px}
   @media(max-width:800px){.hfacs-item{flex-wrap:wrap}.hfacs-item .cat{width:auto}}
   .hiersec{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:none}
   .hiersec h3{margin:0 0 4px;font-size:14px;color:#9fc6e3}
@@ -170,7 +171,7 @@
 </head>
 <body>
 <header class="top">
-  <h1>⧖ Bow Tie Decoder</h1>
+  <h1>⧖ Risk2Safe — Bow Tie Investigation Decoder</h1>
   <div class="sub">Paste or drop an incident investigation report → get an interactive bow tie diagram + human-factors analysis. 100% in your browser, with your own LLM key. Methodology: CCPS/EI <i>Bow Ties in Risk Management</i> + <i>Human Factors in the Chemical and Process Industries</i>.</div>
 </header>
 
@@ -282,7 +283,6 @@
     <div class="bowtie">
       <div class="col">
         <h3>Threats → Prevention barriers</h3>
-        <div class="methodnote"><b>Threat formulation (concept book §2.5.2):</b> threats are <b>specific, direct causes</b> of the top event. Human error is <b>not</b> used as a direct threat — it appears as <span style="color:#b7a6ff;font-weight:600">HF degradation factors</span> on barriers (Chapter 4).</div>
         <div class="leg" id="threatLeg"></div>
       </div>
       <div class="center-col">
@@ -304,7 +304,7 @@
       <div class="cards" id="hfCards"></div>
       <div class="swiss" id="pifWrap">
         <h3 style="color:#cdb7ff;margin:22px 0 6px;font-size:14px">Performance Influencing Factors (PIFs)</h3>
-        <table class="pif"><thead><tr><th>PIF</th><th>How it showed up</th><th>Barriers it degraded</th></tr></thead><tbody id="pifBody"></tbody></table>
+        <table class="pif"><thead><tr><th>PIF</th><th>How it showed up</th><th>Barriers it degraded</th><th>Recommendation</th></tr></thead><tbody id="pifBody"></tbody></table>
       </div>
       <div class="swiss" id="swissWrap">
         <h3 style="color:#cdb7ff;margin:24px 0 6px;font-size:14px">Swiss Cheese — how the holes lined up</h3>
@@ -448,10 +448,10 @@ function buildUserPrompt(reportText){
     consequences:[{title:'Consequence — distinct harm outcome with severity',barriers:[{n:'mitigation barrier',s:'ok|degraded|failed|absent|recommended',hier:'elimination|substitution|engineering|administrative|ppe',desc:'…',hf:'DF for failed barriers',dfc:'DFC for failed barriers',cite:'…'}]}],
     humanFactors:{
       cards:[{tag:'Active failure|Mental model|Violation|Latent failures|Defeated defences|Barrier portfolio|Culture',h:'short heading',p:'2-4 sentence analysis, may use <b> tags'}],
-      pifs:[['PIF name','how it showed up in this incident','barriers it degraded']],
+      pifs:[['PIF name','how it showed up in this incident','barriers it degraded','actionable recommendation to address this PIF']],
       swiss:'one paragraph: how the latent and active holes aligned, naming each layer that failed'
     },
-    hfacs:[{tier:'Unsafe Acts|Preconditions|Supervisory/Leader Influences|Organizational Influences',category:'HFACS category, e.g. Judgment & Decision-Making Errors',code:'DoD HFACS v8.0 nanocode, e.g. AE201',finding:'how this code manifested in the incident',cite:'report refs'}]
+    hfacs:[{tier:'Unsafe Acts|Preconditions|Supervisory/Leader Influences|Organizational Influences',category:'HFACS category, e.g. Judgment & Decision-Making Errors',code:'DoD HFACS v8.0 nanocode, e.g. AE201',finding:'how this code manifested in the incident',recommendation:'actionable recommendation addressing this factor (draw on report recommendations where possible)',cite:'report refs'}]
   },null,1);
   return [
 'Decode the following investigation report into the bow tie + human factors JSON.',
@@ -464,7 +464,8 @@ function buildUserPrompt(reportText){
 '- Barrier status "s" reflects how the barrier PERFORMED ON THE DAY: ok (worked), degraded (partial), failed (did not work), absent (did not exist / not provided).',
 '- Every barrier MUST carry "hier" — its hierarchy-of-control tier (elimination|substitution|engineering|administrative|ppe), classified by mechanism. If the bow tie ends up dominated by administrative/ppe barriers, reflect that weakness in a humanFactors card.',
 '- BARRIER CODING: barriers identified in the investigation get s = ok (SB) if they worked, failed/degraded/absent (FB) if they did not. Then scan the report RECOMMENDATIONS: every recommendation that constitutes a barrier must be added to the matching leg with s:"recommended" (RB) and the recommendation number in cite. For each FAILED barrier populate hf (DF) and dfc (DFC).',
-'- hfacs: 8-16 entries spanning all four tiers (at least one per tier where the report supports it), each with tier, category, v8.0 code, incident-specific finding, and cite.',
+'- hfacs: 8-16 entries spanning all four tiers (at least one per tier where the report supports it), each with tier, category, v8.0 code, incident-specific finding, an actionable recommendation, and cite.',
+'- Every humanFactors.pifs row carries a 4th element: an actionable recommendation addressing that PIF. Every hfacs entry carries a "recommendation". Draw recommendations from the report where available; otherwise propose concise, practical good-practice measures.',
 '- humanFactors.cards: 4-6 cards classifying the failures (error types, violation types, active vs latent, situational awareness/mental model, defeated defences, culture/conduct of operations).',
 '- humanFactors.pifs: 5-9 rows.',
 '- Output ONLY the JSON object, matching this schema exactly:',
@@ -525,7 +526,7 @@ function normalize(d){
   d.humanFactors.cards = d.humanFactors.cards||[];
   d.humanFactors.pifs = d.humanFactors.pifs||[];
   d.humanFactors.swiss = d.humanFactors.swiss||'';
-  d.hfacs = (d.hfacs||[]).map(x=>({tier:x.tier||'',category:x.category||'',code:x.code||'',finding:x.finding||'',cite:x.cite||''}));
+  d.hfacs = (d.hfacs||[]).map(x=>({tier:x.tier||'',category:x.category||'',code:x.code||'',finding:x.finding||'',recommendation:x.recommendation||x.rec||'',cite:x.cite||''}));
   return d;
 }
 
@@ -624,7 +625,7 @@ function renderHfacs(d){
     const div=document.createElement('div');div.className='hfacs-tier t-'+t.key;
     let html='<div class="th">'+t.label+' <span class="lvl">'+t.sub+'</span></div>';
     rows.forEach(r=>{
-      html+='<div class="hfacs-item"><span class="code">'+esc(r.code||'—')+'</span><span class="cat">'+esc(r.category)+'</span><span class="fnd">'+esc(r.finding)+(r.cite?('<span class="ct">Source: '+esc(r.cite)+'</span>'):'')+'</span></div>';
+      html+='<div class="hfacs-item"><span class="code">'+esc(r.code||'—')+'</span><span class="cat">'+esc(r.category)+'</span><span class="fnd">'+esc(r.finding)+(r.recommendation?('<span class="rec">Recommendation: '+esc(r.recommendation)+'</span>'):'')+(r.cite?('<span class="ct">Source: '+esc(r.cite)+'</span>'):'')+'</span></div>';
     });
     div.innerHTML=html;box.appendChild(div);
   });
@@ -658,14 +659,14 @@ function render(d){
   const pb=$('pifBody');pb.innerHTML='';
   d.humanFactors.pifs.forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+esc(r[0]||'')+'</b></td><td>'+esc(r[1]||'')+'</td><td style="color:var(--muted)">'+esc(r[2]||'')+'</td>';
+    tr.innerHTML='<td><b>'+esc(r[0]||'')+'</b></td><td>'+esc(r[1]||'')+'</td><td style="color:var(--muted)">'+esc(r[2]||'')+'</td><td style="color:#6fd2d8">'+esc(r[3]||'')+'</td>';
     pb.appendChild(tr);
   });
   $('pifWrap').style.display = d.humanFactors.pifs.length?'block':'none';
   $('swissText').textContent = d.humanFactors.swiss;
   $('swissWrap').style.display = d.humanFactors.swiss?'block':'none';
   $('hfSection').style.display = (d.humanFactors.cards.length||d.humanFactors.pifs.length||d.humanFactors.swiss)?'block':'none';
-  $('oFooter').innerHTML='<p>Generated by Bow Tie Decoder. Bow tie structure per <i>Bow Ties in Risk Management</i> (CCPS/EI); human factors framing per <i>Human Factors in the Chemical and Process Industries</i> (Elsevier 2016). Barrier status reflects performance on the day of the incident, not design intent. AI-assisted output — verify against the source report before operational use.</p>';
+  $('oFooter').innerHTML='<p>Generated by Risk2Safe — Bow Tie Investigation Decoder. Bow tie structure per <i>Bow Ties in Risk Management</i> (CCPS/EI); human factors framing per <i>Human Factors in the Chemical and Process Industries</i> (Elsevier 2016). Barrier status reflects performance on the day of the incident, not design intent. AI-assisted output — verify against the source report before operational use.</p>';
   FILTER.status='all';FILTER.hier='all';
   document.querySelectorAll('.controls .btn[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));
   document.querySelectorAll('.controls .btn[data-hfilter]').forEach(b=>b.classList.toggle('active',b.dataset.hfilter==='all'));
@@ -809,32 +810,32 @@ const DEMO = {
    {tag:'Culture',h:'Procedures that existed but were not lived',p:'CSB found written procedures broadly aligned with good practice yet routinely not followed or understood by operations and management (Finding 17). The gap between documented and actual practice — operational discipline — is itself a human-factors finding (Recommendation R3).'}
   ],
   pifs:[
-   ['Unfamiliar work environment','Crew had never worked the Amine Unit; relocated from turnaround with no orientation to live-unit hazards.','Hazard communication; positive ID'],
-   ['Poor information / job aids','Blind list and sketch could not locate flanges; no clear drawings in the job package.','Job package; positive ID'],
-   ['Inadequate signage / labelling','No pipe labels; key blind tag hung out of sight on a railing.','Pipe labelling; blind tag'],
-   ['Ambiguous procedures','Broad permit mixing hazards, no unambiguous hold point; "verbal permission" filled the gap.','Permit; operator present'],
-   ['Time on task / workload','Hours of repetitive blind removal; operator pulled away to other duties.','Operator verification'],
-   ['Masked senses / PPE','Supplied-air respirators plus removed detectors eliminated both alarm and smell at the release point.','Gas detector; escape PPE'],
-   ['Acute stress','Flange burst forced disconnection and escape; fine-motor failure with the escape bottle.','Escape respirator'],
-   ['Communication gaps','Radio alerts went unanswered; alerting reverted to running on foot.','Radio notification; area alarms']
+   ['Unfamiliar work environment','Crew had never worked the Amine Unit; relocated from turnaround with no orientation to live-unit hazards.','Hazard communication; positive ID','Mandatory unit orientation and hazard briefing before any crew works a new or status-changed unit (CSB R2).'],
+   ['Poor information / job aids','Blind list and sketch could not locate flanges; no clear drawings in the job package.','Job package; positive ID','Quality-check job packages against P&IDs; include location-specific drawings usable at the point of work.'],
+   ['Inadequate signage / labelling','No pipe labels; key blind tag hung out of sight on a railing.','Pipe labelling; blind tag','A13.1 pipe labelling plus an at-flange tagging standard with visibility verification (CSB R1, R4).'],
+   ['Ambiguous procedures','Broad permit mixing hazards, no unambiguous hold point; "verbal permission" filled the gap.','Permit; operator present','Hazard-segregated permits with explicit signed hold points; prohibit verbal continuation; audit permits (CSB R3).'],
+   ['Time on task / workload','Hours of repetitive blind removal; operator pulled away to other duties.','Operator verification','Plan operator coverage so line-break attendance is never displaced by other duties; stagger high-hazard tasks.'],
+   ['Masked senses / PPE','Supplied-air respirators plus removed detectors eliminated both alarm and smell at the release point.','Gas detector; escape PPE','Require personal gas detectors even on supplied air; stage a portable area monitor at every line break.'],
+   ['Acute stress','Flange burst forced disconnection and escape; fine-motor failure with the escape bottle.','Escape respirator','Regular hands-on escape-set drills under realistic conditions; buddy-checked donning before line breaks.'],
+   ['Communication gaps','Radio alerts went unanswered; alerting reverted to running on foot.','Radio notification; area alarms','Acknowledged emergency radio protocol with a backup alerting path when no acknowledgement is received.']
   ],
   swiss:'The trajectory passed cleanly through every layer: a broad permit mixing hazards without a hard hold point → a blind tag hung out of sight on a railing → no pipe labelling to tell ARU6 from ARU7 → a misleading unlocked flange-locking device on the live line → contractors moved into an active unit without a hazard briefing → the operator absent at the line break → the personal gas detector removed by policy. Remove any single slice and the release is interrupted. None held.'
  },
  hfacs:[
-  {tier:'Organizational Influences',category:'Policy & Process Issues',code:'OP003',finding:'Permitting policy was unclear and impractical in use: one broad permit covered jobs with different hazards against written rules, and procedures across permitting, marking and isolation were routinely misunderstood by staff and management.',cite:'CSB §3.2, §3.4; Findings 11, 17'},
-  {tier:'Organizational Influences',category:'Organizational Culture',code:'OC001',finding:'Documented practice and actual practice diverged across the site — deviation from written procedures was normal and accepted, creating elevated risk (weak conduct of operations).',cite:'CSB §3.4; Finding 17; R3'},
-  {tier:'Organizational Influences',category:'Program Management / Governance',code:'OP006',finding:'Turnaround contractor management lacked governance for moving crews between units of different status — no programme ensured hazard instruction on reassignment.',cite:'CSB §3.3; Findings 14-16; R2'},
-  {tier:'Supervisory/Leader Influences',category:'Provided Inadequate Procedure/Guidance',code:'SI004',finding:'The job package (blind list and sketch) and the permit gave the crew no clear, unambiguous guidance on which flange to open or where to stop work.',cite:'CSB §3.1.1; Findings 1, 12'},
-  {tier:'Supervisory/Leader Influences',category:'Normalization of Deviance',code:'SD002',finding:'Unwritten practices had become standard: continuing line breaks on "verbal permission" without the operator, hanging blind tags off the flange, and leaving unlocked flange-locking devices in the field.',cite:'CSB §2.3-2.4; Findings 2, 11'},
-  {tier:'Supervisory/Leader Influences',category:'Ineffective Deliberate Risk Assessment',code:'SP006',finding:'No evaluation of the risk of opening live acid-gas piping directly upwind of an occupied turnaround unit; the option to defer the work was never weighed.',cite:'CSB §3.2.3; Finding 13'},
-  {tier:'Supervisory/Leader Influences',category:'Tasked Individuals Lacking Familiarity',code:'SI008',finding:'A day-shift crew that had never worked the Amine Unit, and had not installed the blinds, was assigned the removal task without orientation to the live unit.',cite:'CSB §2.3; Findings 14-16'},
-  {tier:'Preconditions',category:'Negative Habit Transfer',code:'PC105',finding:'The boilermakers reverted to highly learned turnaround behaviour — using flange-locking devices as work markers — in a unit where that convention did not apply.',cite:'CSB §2.4; Findings 2, 6'},
-  {tier:'Preconditions',category:'Change Blindness / Inaccurate Expectation',code:'PC110',finding:'The crew expected a fully isolated "Positive Isolation" environment and did not perceive they had moved into a partially operational unit containing pressurised H₂S.',cite:'CSB §3.3; Findings 15-16'},
-  {tier:'Preconditions',category:'Planning / Briefing Inadequate',code:'PP109',finding:'No pre-task briefing covered the hazards, safeguards and requirements of the Amine Unit before the crew began the blind-removal work.',cite:'CSB §3.3; Finding 14'},
-  {tier:'Preconditions',category:'Personal Equipment Interference',code:'PE207',finding:'Supplied-air hoods plus the policy-permitted removal of personal H₂S detectors eliminated both smell and alarm at the release point, masking the leak while bolts were removed.',cite:'CSB §2.4-2.5'},
-  {tier:'Unsafe Acts',category:'Misjudged / Misperceived Environment',code:'AE207',finding:'The boilermakers identified the wrong, live ARU7 flange as Blind 407 from misleading field cues (an unlocked flange-locking device) — a judgment error, executed exactly as intended.',cite:'CSB §2.4-2.5; Finding 2'},
-  {tier:'Unsafe Acts',category:'Procedure / Checklist Not Followed Correctly',code:'AE102',finding:'The blind list and drawing were not used to locate the work, and the permit instruction to stop and have an operator present before acid-gas line breaks was overlooked.',cite:'CSB §2.4; Findings 1, 12'},
-  {tier:'Unsafe Acts',category:'Inadequate Real-Time Risk Assessment',code:'AE201',finding:'The final, highest-hazard line breaks proceeded without the operator and without point-of-work verification that the piping was depressurised.',cite:'CSB §2.3-2.4; Finding 11'}
+  {tier:'Organizational Influences',category:'Policy & Process Issues',code:'OP003',finding:'Permitting policy was unclear and impractical in use: one broad permit covered jobs with different hazards against written rules, and procedures across permitting, marking and isolation were routinely misunderstood by staff and management.',recommendation:'Rewrite permitting, marking and isolation policy for clarity and field workability; verify understanding through regular audits (CSB R3).',cite:'CSB §3.2, §3.4; Findings 11, 17'},
+  {tier:'Organizational Influences',category:'Organizational Culture',code:'OC001',finding:'Documented practice and actual practice diverged across the site — deviation from written procedures was normal and accepted, creating elevated risk (weak conduct of operations).',recommendation:'Establish a conduct of operations programme with management commitment, behavioural metrics, leadership by example and routine adherence audits (CSB R3).',cite:'CSB §3.4; Finding 17; R3'},
+  {tier:'Organizational Influences',category:'Program Management / Governance',code:'OP006',finding:'Turnaround contractor management lacked governance for moving crews between units of different status — no programme ensured hazard instruction on reassignment.',recommendation:'Formal contractor-management governance: documented process for crew reassignment between units, with mandatory hazard instruction before work starts (CSB R2).',cite:'CSB §3.3; Findings 14-16; R2'},
+  {tier:'Supervisory/Leader Influences',category:'Provided Inadequate Procedure/Guidance',code:'SI004',finding:'The job package (blind list and sketch) and the permit gave the crew no clear, unambiguous guidance on which flange to open or where to stop work.',recommendation:'Issue location-specific job packages reviewed against P&IDs, and permits with explicit, signed hold points for every line break.',cite:'CSB §3.1.1; Findings 1, 12'},
+  {tier:'Supervisory/Leader Influences',category:'Normalization of Deviance',code:'SD002',finding:'Unwritten practices had become standard: continuing line breaks on "verbal permission" without the operator, hanging blind tags off the flange, and leaving unlocked flange-locking devices in the field.',recommendation:'Supervisors enforce written practice in the field — prohibit verbal continuation, audit tag placement and lock control, and coach out informal shortcuts before they become standard.',cite:'CSB §2.3-2.4; Findings 2, 11'},
+  {tier:'Supervisory/Leader Influences',category:'Ineffective Deliberate Risk Assessment',code:'SP006',finding:'No evaluation of the risk of opening live acid-gas piping directly upwind of an occupied turnaround unit; the option to defer the work was never weighed.',recommendation:'Deliberate SIMOPs risk assessment before any line break near occupied areas, with deferral as the default option where exposure overlap exists.',cite:'CSB §3.2.3; Finding 13'},
+  {tier:'Supervisory/Leader Influences',category:'Tasked Individuals Lacking Familiarity',code:'SI008',finding:'A day-shift crew that had never worked the Amine Unit, and had not installed the blinds, was assigned the removal task without orientation to the live unit.',recommendation:'Match crew experience to task criticality; require documented unit familiarisation before assigning work in an unfamiliar or live unit.',cite:'CSB §2.3; Findings 14-16'},
+  {tier:'Preconditions',category:'Negative Habit Transfer',code:'PC105',finding:'The boilermakers reverted to highly learned turnaround behaviour — using flange-locking devices as work markers — in a unit where that convention did not apply.',recommendation:'Make context changes explicit at pre-job briefs; remove turnaround-specific hardware and markings from run-and-maintain units so old cues cannot mislead.',cite:'CSB §2.4; Findings 2, 6'},
+  {tier:'Preconditions',category:'Change Blindness / Inaccurate Expectation',code:'PC110',finding:'The crew expected a fully isolated "Positive Isolation" environment and did not perceive they had moved into a partially operational unit containing pressurised H₂S.',recommendation:'Explicit unit-status communication on every reassignment — signage at unit boundaries, briefing, and a permit statement of unit status (CSB R2).',cite:'CSB §3.3; Findings 15-16'},
+  {tier:'Preconditions',category:'Planning / Briefing Inadequate',code:'PP109',finding:'No pre-task briefing covered the hazards, safeguards and requirements of the Amine Unit before the crew began the blind-removal work.',recommendation:'Mandatory pre-task briefing covering hazards, safeguards and requirements, with each craftworker confirming understanding before starting (CSB R2).',cite:'CSB §3.3; Finding 14'},
+  {tier:'Preconditions',category:'Personal Equipment Interference',code:'PE207',finding:'Supplied-air hoods plus the policy-permitted removal of personal H₂S detectors eliminated both smell and alarm at the release point, masking the leak while bolts were removed.',recommendation:'Require personal gas detectors to be worn with supplied air; stage area monitoring at the point of work so the crew retains leak indication.',cite:'CSB §2.4-2.5'},
+  {tier:'Unsafe Acts',category:'Misjudged / Misperceived Environment',code:'AE207',finding:'The boilermakers identified the wrong, live ARU7 flange as Blind 407 from misleading field cues (an unlocked flange-locking device) — a judgment error, executed exactly as intended.',recommendation:'Positive equipment identification jointly verified by operator and crew at the point of work before any joint is broken (CSB R1, R4).',cite:'CSB §2.4-2.5; Finding 2'},
+  {tier:'Unsafe Acts',category:'Procedure / Checklist Not Followed Correctly',code:'AE102',finding:'The blind list and drawing were not used to locate the work, and the permit instruction to stop and have an operator present before acid-gas line breaks was overlooked.',recommendation:'Make the blind list/drawing a mandatory point-of-use document, reconciled at each flange; enforce hold points that physically stop work.',cite:'CSB §2.4; Findings 1, 12'},
+  {tier:'Unsafe Acts',category:'Inadequate Real-Time Risk Assessment',code:'AE201',finding:'The final, highest-hazard line breaks proceeded without the operator and without point-of-work verification that the piping was depressurised.',recommendation:'No line break without operator presence and verified isolation (drain/bleed/gauge/gas test) — enforced by withholding the permit until both are confirmed.',cite:'CSB §2.3-2.4; Finding 11'}
  ]
 };
 $('demoBtn').addEventListener('click',()=>{DATA=normalize(JSON.parse(JSON.stringify(DEMO)));render(DATA);setStatus('PEMEX demo loaded ✓','good');});
