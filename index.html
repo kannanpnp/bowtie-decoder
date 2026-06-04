@@ -77,7 +77,6 @@
   .barrier.failed{border-color:#5a2624;background:#241715}
   .barrier.degraded{border-color:#5a4a1e;background:#241f12}
   .barrier.absent{border-style:dashed}
-  .barrier .hf{position:absolute;top:-6px;right:-6px;width:15px;height:15px;border-radius:50%;background:var(--hazard);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid var(--panel)}
   .hchip{font-size:8.5px;font-weight:700;letter-spacing:.4px;padding:1px 5px;border-radius:4px;flex:none}
   .h-elimination{background:#123524;color:#6fdc9a;border:1px solid #2e9e5b}
   .h-substitution{background:#0f2e33;color:#5fc9d8;border:1px solid #2e8a9e}
@@ -254,7 +253,7 @@
       <span class="item"><span class="swatch" style="background:var(--failed)"></span><b>FB</b>&nbsp;Failed barrier — failed on the day</span>
       <span class="item"><span class="swatch" style="background:var(--absent)"></span><b>FB</b>&nbsp;Failed barrier — absent</span>
       <span class="item"><span class="swatch" style="background:#3da3a8"></span><b>RB</b>&nbsp;Recommended barrier (from report recommendations)</span>
-      <span class="item"><span class="swatch" style="background:var(--hazard)"></span><b style="color:#b7a6ff">HF</b>&nbsp;= degradation factor DF (+ its controls DFC) — click a barrier</span>
+      <span class="item">Click any barrier for details, DF &amp; DFC</span>
     </div>
     <div class="legend" style="margin-top:-8px">
       <span class="item" style="color:var(--muted)">Hierarchy of control:</span>
@@ -268,7 +267,6 @@
     <div class="controls">
       <button class="btn active" data-filter="all">Show all barriers</button>
       <button class="btn" data-filter="failed">Only failed / absent</button>
-      <button class="btn" data-filter="hf">Only barriers with HF factors</button>
       <span style="width:14px"></span>
       <button class="btn active" data-hfilter="all">All tiers</button>
       <button class="btn" data-hfilter="elimination">Elimination</button>
@@ -576,7 +574,7 @@ function barrierEl(b){
   el.dataset.hier=b.hier||'';
   const chip = b.hier?('<span class="hchip h-'+b.hier+'" title="'+HIER_LABEL[b.hier]+' control">'+HIER_CHIP[b.hier]+'</span>'):'';
   const stag = '<span class="stag stag-'+b.s+'" title="'+statusLabel[b.s]+'">'+STATUS_TAG[b.s]+'</span>';
-  el.innerHTML='<span class="dot '+b.s+'"></span>'+stag+chip+'<span>'+esc(b.n)+'</span>'+(b.hf?'<span class="hf">HF</span>':'');
+  el.innerHTML='<span class="dot '+b.s+'"></span>'+stag+chip+'<span>'+esc(b.n)+'</span>';
   el.addEventListener('click',()=>openDetail(b));
   return el;
 }
@@ -697,7 +695,6 @@ function applyFilters(){
   document.querySelectorAll('.barrier').forEach(el=>{
     let s=true,h=true;
     if(FILTER.status==='failed') s = el.dataset.status==='failed'||el.dataset.status==='absent';
-    if(FILTER.status==='hf') s = el.dataset.hf==='1';
     if(FILTER.hier!=='all') h = el.dataset.hier===FILTER.hier;
     el.style.display=(s&&h)?'':'none';
   });
